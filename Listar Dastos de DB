@@ -1,0 +1,282 @@
+
+@{
+    ViewBag.Title = "Ventas";
+}
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-beta.1/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-beta.1/dist/js/select2.min.js"></script>
+
+<div class="panel container-fluid">
+    <div class="row">
+        <div class="col-md-12 content">
+            <div class="panel panel-default">
+                <div class="panel-heading input-sm">
+                    <label class="control-label">Cliente</label>
+                </div>
+                <div class="panel-body">
+                    <div class="panel-title text-left">
+                        <div class="form-group input-sm">
+                            <div class="col-md-2" style="text-align:right">
+                                <label class="control-label">Ruc/Nombre:</label>
+                            </div>
+                            <div class="col-md-2">
+                                <input id="txtRuc" type="text" class="form-control input-sm text-uppercase" />
+                                <input id="IdCliente" type="text" hidden />
+
+                            </div>
+
+                            <div class="col-md-2" style="text-align:right">
+                                <label class="control-label">Productos:</label>
+                            </div>
+
+                            <div class="col-md-6">
+                                <select class='mi-selector ' id="ListVentas" name='marcas' style="width: 75%">
+                                </select>
+
+                                <br />
+                                <br />
+                                <button type="button" class="btn btn-primary" onclick="Detalle()">Detalle</button>
+                            </div>
+                        </div>
+                        <div class="form-group input-sm" hidden>
+                            <div class="col-md-2" style="text-align:right">
+                                <label class="control-label">Cliente:</label>
+                            </div>
+                            <div class="col-md-2">
+                                <textarea id="txtRazon" class="form-control input-sm" cols="2" rows="3" readonly="readonly"></textarea>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+
+    </div>
+
+
+    <div class="row">
+        <div class="col-md-12 content">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <label id="DatoCotizacion" class="control-label">Historial de Ventas</label>
+
+                </div>
+                <div class="panel-body">
+                    <div class="panel-title">
+                        <div id="ContainerGrid" class="form-group input-sm">
+                            <table id="Grill"></table>
+                            <div id="paginado"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script type="text/javascript">
+    var pathImg = '@Url.Content("~/img")';
+    $(function () {
+        $("#ContainerGrid").height(190);
+        $('.mi-selector').select2({
+            language: {
+
+                noResults: function () {
+
+                    return "No hay resultado";
+                },
+                searching: function () {
+
+                    return "Buscando..";
+                }
+            }
+        });
+
+    });
+
+    $(document).ready(function () {
+
+        $("#txtRuc").autocomplete({
+
+            //autoFocus: true,
+            minLength: 2,
+            source: function (request, response) {
+                $.ajax({
+                    type: "POST",
+                    url: '@Url.Content("~/Almacen/BuscarCliente")',
+                    dataType: "json",
+                    data: { dato: request.term },
+                    success: function (data) {
+                        //console.log(data);
+                        response($.map(data, function (item) {
+                            return { label: item.Nombre, value: item.ClienteId, nroDocumento: item.NroDocumento };
+                        }));
+
+                        LimpiarOptions();
+                        $("#Grill").jqGrid('GridUnload');
+
+                    }
+                });
+            },
+            select: function (event, ui) {
+                $('#txtRuc').val(ui.item.nroDocumento);
+                $('#IdCliente').val(ui.item.value);
+                $('#txtRazon').val(ui.item.label);
+
+
+                return false;
+            },
+            change: function (event, ui) {
+                if (!ui.item) {
+                    $('#txtRuc').val('');
+                    $('#txtRazon').val('');
+
+                    return false;
+                }
+            },
+            messages: {
+                noResults: 'No results found.',
+                results: function (count) {
+                    return count + (count > 1 ? ' results' : ' result ') + ' found';
+                }
+            }
+        });
+    }
+    )
+
+    $(":input").on(" change", function (e) {
+        var ClienteId = $("#IdCliente").val();
+        console.log(ClienteId)
+        $.ajax({
+            url: '@Url.Content("~/Almacen/ListProductSold")',
+            type: 'POST',
+            data: { ClienteId: ClienteId },
+            DataType: 'json',
+            success: function (res) {
+                var lista = $("#ListVentas");
+                $.each(res, function (index, elemento) {
+                    lista.append(
+                        '<option value=' + elemento.ProductoId + ' >' + elemento.Descripcion + '</option>'
+                    );
+                });
+            },
+            error: function () {
+                console.log("No se ha podido obtener la información");
+            }
+        });
+    })
+
+    function Detalle() {
+        $("#Grill").jqGrid('GridUnload');
+        ClienteId = $("#IdCliente").val();
+        ProductoId = document.getElementById('ListVentas').value;
+        var tbl_lista = $("#Grill");
+        $("#Grill").jqGrid({
+            url: '@Url.Content("~/Almacen/DetalleVenta")',
+            mtype: 'POST',
+            loadonce: false,
+            ajaxGridOptions: { contentType: "application/json" },
+            datatype: "json",
+            rowNum: 10,
+            rowList: [5, 10, 20, 50],
+            serializeGridData: function (postData) {
+                var dataToSend = {
+                    page: postData.page,
+                    rows: postData.rows,
+                    sidx: postData.sidx,
+                    sord: postData.sord,
+                    ClienteId: ClienteId,
+                    ProductoId: ProductoId
+                }
+                return JSON.stringify(dataToSend);
+            },
+            jsonReader: {
+                root: function (obj) {
+                    //console.log(obj);
+                    return obj.data;
+                },
+                page: function (obj) { return obj.page; },
+                total: function (obj) { return obj.total; },
+                records: function (obj) { return obj.records; },
+                id: '0',
+                cell: '',
+                repeatitems: false
+            },
+            height: 150,
+            width: 1060,
+            formatter: {
+                number: { decimalSeparator: ".", thousandsSeparator: ",", decimalPlaces: 2, defaultValue: '0.00' }
+            },
+            colNames: ['ProductoId', 'Descripcion', 'FechaCotizacion', 'Cantidad'],
+            colModel: [
+                { name: 'ProductoId', index: 'ProductoId', width: 80, key: true, hidden: true },
+                { name: 'Descripcion', index: 'Descripcion', width: 320 },
+                {
+                    name: 'FechaCotizacion', index: 'FechaCotizacion', width: 150, align: 'center',
+                    formatter: 'date', formatoptions: { srcformat: 'd/m/Y', newformat: 'd/m/Y' }
+                },
+                { name: 'Cantidad', index: 'Cantidad', width: 50, align: 'center' }
+
+            ],
+
+            shrinkToFit: false,
+            rownumbers: false,
+            pager: '#paginador',
+            emptyrecords: "No existen resultados...",
+            ignoreCase: true,
+            viewrecords: true,
+            gridview: true,
+            'cellEdit': true,
+            cellsubmit: 'clientArray',
+            beforeEditCell: function (rowid, cellname, value, iRow, iCol) {
+
+
+            },
+            afterSaveCell: function (rowid, name, val, iRow, iCol) {
+
+
+            },
+            loadComplete: function (datos) { },
+            multiselect: false,
+            onSelectAll: function (aRowids, status) {
+                if (status) {
+                    // uncheck "protected" rows
+                    var cbs = $("tr.jqgrow > td > input.cbox:disabled", tbl_lista[0]);
+                    $("tr.jqgrow > td > input.cbox:disabled", $("#Grill")[0]).parent().parent().removeClass("ui-state-highlight");
+                    $("#Grilla_frozen tr.jqgrow > td > input.cbox:disabled").parent().parent().removeClass("ui-state-highlight");
+                    cbs.removeAttr("checked");
+
+                    //modify the selarrrow parameter
+                    tbl_lista[0].p.selarrrow = tbl_lista.find("tr.jqgrow:has(td > input.cbox:checked)")
+                        .map(function () { return this.id; }) // convert to set of ids
+                        .get(); // convert to instance of Array
+                }
+            },
+            gridComplete: function () {
+
+                //if (arrFiltros != null) {
+
+                //}
+            }
+        }).navGrid('#paginado', { del: false, add: false, edit: false }, {}, {}, {}, { multipleSearch: false });
+        $(".ui-jqgrid-resize").remove();
+
+        //jQuery("#Grilla").jqGrid('filterToolbar', { stringResult: true, searchOnEnter: false, defaultSearch: "Nombre" });
+    }
+
+    function LimpiarOptions() {
+        $("#ListVentas").empty();
+    }
+    function LimpiarDetalle() {
+        $("#DetalleVenta").empty();
+    }
+    $("#txtRuc").click(function () {
+        $('input[type="text"]').val('');
+        LimpiarOptions();
+        $("#Grill").jqGrid('GridUnload');
+    })
+
+</script>
