@@ -117,16 +117,18 @@
 
                         LimpiarOptions();
                         $("#Grill").jqGrid('GridUnload');
+                        
 
                     }
                 });
             },
             select: function (event, ui) {
                 $('#txtRuc').val(ui.item.nroDocumento);
+                
                 $('#IdCliente').val(ui.item.value);
                 $('#txtRazon').val(ui.item.label);
 
-
+                $('#txtRuc').blur();
                 return false;
             },
             change: function (event, ui) {
